@@ -275,7 +275,7 @@ int main(void)
 		usart_puts2("\r\n");
 
 		uint16_t ret = MicrogearPublishInt(&mg, "/nbiot/rssi", cnt);
-		MicrogearWriteFeed(&mg, "agrinno01", "Temp : 25");
+		MicrogearWriteFeed(&mg,"agrinno1", "temp1:24.6,Temp:62.8");
 		if(ret == 0){
 			usart_puts2("Microgear fail\r\n");			
 		}
