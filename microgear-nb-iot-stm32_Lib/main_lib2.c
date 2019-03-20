@@ -1,10 +1,11 @@
 #include "stm32f10x.h"
 #include "stm32f10x_conf.h"
-#include "BC95.h"
-//#include <queue>
-#include "BC95Udp.h"
-#include "Dns.h"
-#include "CoAP.h"
+// #include "./libMicroGear/atcommand.h"
+#include "./libMicroGear/NBQueue.h"
+#include "./libMicroGear/NBUart.h"
+#include "./libMicroGear/NBDNS.h"
+#include "./libMicroGear/NBCoAP.h"
+#include "./libMicroGear/NBMicrogear.h"
 
 void init_usart1(void);
 void init_usart2(void);
@@ -15,11 +16,6 @@ void usart_puts2(char* s);
 
 void USART1_IRQHandler(void);
 void USART2_IRQHandler(void);
-
-BC95_str bc95;
-BC95UDP udpclient;
-DNS_CLIENT dns;
-Coap coap;
 
 static inline void Delay_1us(uint32_t nCnt_1us)
 {
@@ -34,6 +30,17 @@ static inline void Delay(uint32_t nCnt_1us)
 
 			while(nCnt_1us--);
 }
+
+NBQueue q;
+NBUart nb;
+UDPConnection udpclient, dns_udp;
+DNSClient dns;
+CoAPClient ap;
+Microgear mg;
+
+#define APPID    "testSTM32iot"
+#define KEY      "fpqdyJ2TSoYbjW3"
+#define SECRET   "qZzPf0KjlFkYeLHsr3DbgU1ZB"
 
 void init_usart1()
 {
@@ -123,22 +130,20 @@ void init_usart2()
 	USART_Cmd(USART2, ENABLE);
 }
 
-// char buffer[10];
-// uint8_t idx=0;
-// bool status = false;
-
 void USART1_IRQHandler(void)
 {
-
+	//char cmd[20];
     char b;    
     if(USART_GetFlagStatus(USART1, USART_FLAG_RXNE) == SET) {
 
-          b =  USART_ReceiveData(USART1);
+        b =  USART_ReceiveData(USART1);
+        NBQueueInsert(&q, (uint8_t)b);
 
-          BC95_push(&bc95,b);
+		//USART_SendData(USART2, b);
+        //sprintf(cmd, "index: %u\r\n", bc95->InboundIndex);
+        //usart_puts2(cmd);
     }
 }
-
 
 void USART2_IRQHandler(void)
 {
@@ -179,53 +184,128 @@ void usart_puts2(char* s)
     }
 }
 
-char remoteIP[16];
-char *premoteIP;
-
 void responseHandler(CoapPacket *packet, char* remoteIP, int remotePort){
 	char buff[6];
 	usart_puts2("CoAP Response Code: ");
-	sprintf(buff, "%d.%02d\n", packet->code >> 5, packet->code & 0b00011111);
+	sprintf(buff, "%d.%02d\n", packet->Code >> 5, packet->Code & 0b00011111);
     usart_puts2(buff);
 
-    for (int i=0; i< packet->payloadlen; i++) {
+    for (int i=0; i< packet->Payloadlen; i++) {
         //Serial.print((char) (packet->payload[i]));
         char x[1];
-        sprintf(x,"%c", (char) (packet->payload[i]));
+        sprintf(x,"%c", (char) (packet->Payload[i]));
         usart_puts2(x);
     }
 }
 
 int main(void)
 {
-	// init
+	char text[200];
+	Delay_1us(1000000);
 	init_usart1();
 	init_usart2();
 
-	// bc95 init UART
-	BC95_init(USART1, &bc95);
-	Delay_1us(500000);
-	usart_puts2("starting...\r\n");
+	usart_puts2("START\r\n");
 
-	// attach
-	while(!BC95_attachNetwork(&bc95)){
-		usart_puts2("attach..\r\n");
+	NBQueueInit(&q);
+	NBUartInit(&nb, USART1, &q);
+
+
+	// NBUartSend(&nb, "AT+CIMI\r\n");
+	// int8_t ret = NBUartGetResponseT(&nb, 100);
+	// if(ret==READ_COMPLETE_OK){
+	// 	usart_puts2(">>");
+	// 	NBUartGetStringT(&nb,text);
+	// 	uint8_t len = strlen(text);
+
+	// 	usart_puts2(text);
+	// 	usart_puts2("\r\n");
+
+	// 	sprintf(text, "len: %d\r\n", len);
+	// 	usart_puts2(text);
+	// 	usart_puts2("\r\n");
+	// } else if(ret == READ_COMPLETE_ERROR) {
+	// 	usart_puts2("<<error\r\n");
+	// } else if(ret == READ_INCOMPLETE) {
+	// 	usart_puts2("<<incomplete\r\n");
+	// } else if(ret == READ_OVERFLOW) {
+	// 	usart_puts2("<<overflow\r\n");
+	// } else if(ret == READ_TIMEOUT) {
+	// 	usart_puts2("<<timeout\r\n");
+	// } 
+
+	//ret = NBUartGetResponseT(&nb, 100);
+	bool ret= false;
+
+	// usart_puts2("rebooting...\r\n");
+	// ret = NBUartReset_T(&nb);
+	// if(ret){
+	// 	usart_puts2("reboot ok!\r\n");
+	// }
+
+	usart_puts2("getIMI...\r\n");
+	ret = NBUartGetIMI_T(&nb, text);
+	if(ret){
+		usart_puts2(text);
+		usart_puts2("\r\n");
 	}
-	usart_puts2("NB-IOT connected..\r\n");
 
-	// init
-	BC95Udp_init(&udpclient, &bc95);
-	CoAP_init(&coap, &udpclient);
-    
-    // set handler
-	CoAP_response(&coap, responseHandler);
-	CoAP_start(&coap);
-	CoAP_get(&coap,"coap.me", 5683, "/hello");
-
-	while(true){
-		CoAP_loop(&coap);
+	usart_puts2("getModel...\r\n");
+	ret = NBUartGetManufacturerModel_T(&nb, text);
+	if(ret){
+		usart_puts2(text);
+		usart_puts2("\r\n");
 	}
-	// end
-	usart_puts2("end\r\n");
+
+	
+	do{
+		usart_puts2("attact...\r\n");
+		ret = NBUartAttachNetwork_T(&nb);
+	}while(!ret);
+
+	usart_puts2("getIPAddress...\r\n");
+
+	char ip[20];
+	ret = NBUartGetIPAddress_T(&nb, ip);
+	if(ret){
+		usart_puts2(ip);
+		usart_puts2("\r\n");
+	}
+
+	usart_puts2("getSignal Strength...\r\n");
+	int8_t sig = NBUartGetSignalStrength_T(&nb);
+	sprintf(text, "RSSI: %d", sig);
+	usart_puts2(text);
+	usart_puts2("\r\n");
+
+	usart_puts2("create socket...\r\n");
+	Socket s = NBUartCreateSocket_T(&nb, 8081);
+	if(s.Status==1){
+		usart_puts2("\r\ncreate socket ok\r\n");
+	} else {
+		usart_puts2("\r\ncreate socket error\r\n");	
+	}
+
+	char *p = "Helloworld";
+	uint8_t len = strlen(p);
+	ret = NBUartSendPacket_T(&nb, &s, ip, 8081, (uint8_t*)p, len);
+
+	Delay_1us(3000000);
+	ret = NBUartFetchPacket_T(&nb, &s, len, text);
+	if(ret){		
+		usart_puts2(text);
+		usart_puts2("\r\n");
+	}else {
+		usart_puts2("\r\nfetch error\r\n");
+	}
+
+	ret = NBUartCloseSocket_T(&nb, &s);
+	if(ret){
+		usart_puts2("\r\nclose socket ok\r\n");
+	}else {
+		usart_puts2("\r\nclose socket error\r\n");
+	}
+
+	usart_puts2("END\r\n");
 }
 

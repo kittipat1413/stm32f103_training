@@ -37,13 +37,26 @@ CFLAGS_INCLUDE=-I./ \
 USER_LIB=../User_Lib
 
 #User Source Files
-SRC+=	./main_microgear.c \
-		./BC95.c \
-		./BC95Udp.c \
-		./CoAP.c \
-		./Dns.c \
-		./MicrogearNB.c \
-		./stm32f10x_it.c 
+SRC+=	./main_lib_microgear.c \
+		./stm32f10x_it.c \
+		./libMicroGear/NBQueue.c \
+		./libMicroGear/NBUart.c \
+		./libMicroGear/NBDNS.c \
+		./libMicroGear/NBCoAP.c \
+		./libMicroGear/NBMicrogear.c \
+		# ./BC95.c \
+		# ./BC95Udp.c \
+		# ./Dns.c \
+		# ./CoAP.c \
+		# ./MicrogearNB.c \
+		
+		
+		
+		
+		
+		#./libMicroGear/atcommand.c \
+		
+		
 
 
 #User Header Files

@@ -1,10 +1,11 @@
 #include "stm32f10x.h"
 #include "stm32f10x_conf.h"
-#include "BC95.h"
-//#include <queue>
-#include "BC95Udp.h"
-#include "Dns.h"
-#include "CoAP.h"
+// #include "./libMicroGear/atcommand.h"
+#include "./libMicroGear/NBQueue.h"
+#include "./libMicroGear/NBUart.h"
+#include "./libMicroGear/NBDNS.h"
+#include "./libMicroGear/NBCoAP.h"
+#include "./libMicroGear/NBMicrogear.h"
 
 void init_usart1(void);
 void init_usart2(void);
@@ -15,11 +16,6 @@ void usart_puts2(char* s);
 
 void USART1_IRQHandler(void);
 void USART2_IRQHandler(void);
-
-BC95_str bc95;
-BC95UDP udpclient;
-DNS_CLIENT dns;
-Coap coap;
 
 static inline void Delay_1us(uint32_t nCnt_1us)
 {
@@ -34,6 +30,15 @@ static inline void Delay(uint32_t nCnt_1us)
 
 			while(nCnt_1us--);
 }
+
+NBQueue q;
+NBUart nb;
+UDPConnection main_udp, dns_udp;
+Microgear mg;
+
+#define APPID    "FirstApplication"
+#define KEY      "L9ShSgZmMRCmULx"
+#define SECRET   "4m9iBxGshduGpts4xFfV6kx2p"
 
 void init_usart1()
 {
@@ -123,22 +128,20 @@ void init_usart2()
 	USART_Cmd(USART2, ENABLE);
 }
 
-// char buffer[10];
-// uint8_t idx=0;
-// bool status = false;
-
 void USART1_IRQHandler(void)
 {
-
+	//char cmd[20];
     char b;    
     if(USART_GetFlagStatus(USART1, USART_FLAG_RXNE) == SET) {
 
-          b =  USART_ReceiveData(USART1);
+        b =  USART_ReceiveData(USART1);
+        NBQueueInsert(&q, (uint8_t)b);
 
-          BC95_push(&bc95,b);
+		//USART_SendData(USART2, b);
+        //sprintf(cmd, "index: %u\r\n", bc95->InboundIndex);
+        //usart_puts2(cmd);
     }
 }
-
 
 void USART2_IRQHandler(void)
 {
@@ -179,53 +182,109 @@ void usart_puts2(char* s)
     }
 }
 
-char remoteIP[16];
-char *premoteIP;
-
 void responseHandler(CoapPacket *packet, char* remoteIP, int remotePort){
 	char buff[6];
 	usart_puts2("CoAP Response Code: ");
-	sprintf(buff, "%d.%02d\n", packet->code >> 5, packet->code & 0b00011111);
+	sprintf(buff, "%d.%02d\n", packet->Code >> 5, packet->Code & 0b00011111);
     usart_puts2(buff);
 
-    for (int i=0; i< packet->payloadlen; i++) {
+    for (int i=0; i< packet->Payloadlen; i++) {
         //Serial.print((char) (packet->payload[i]));
         char x[1];
-        sprintf(x,"%c", (char) (packet->payload[i]));
+        sprintf(x,"%c", (char) (packet->Payload[i]));
         usart_puts2(x);
     }
 }
 
 int main(void)
 {
-	// init
+	char text[200];
+	bool ret= false;
+	uint16_t datalen=0;
+	// small delay
+	Delay_1us(1000000);
+
+	// initialize UART
 	init_usart1();
 	init_usart2();
 
-	// bc95 init UART
-	BC95_init(USART1, &bc95);
-	Delay_1us(500000);
-	usart_puts2("starting...\r\n");
+	start:
+	usart_puts2("START\r\n");
 
-	// attach
-	while(!BC95_attachNetwork(&bc95)){
-		usart_puts2("attach..\r\n");
+	// initialize NB-iot Queue
+	NBQueueInit(&q);
+	// initialize NB-iot UART
+	NBUartInit(&nb, USART1, &q);
+	// initialize NB-iot main UDP
+	ret = UDPInit(&main_udp, &nb);
+	if(!ret){
+		usart_puts2("MAIN UDP init error.\r\n");
+		return 0;
 	}
-	usart_puts2("NB-IOT connected..\r\n");
+	// initialize NB-iot dns UDP
+	ret = UDPInit(&dns_udp, &nb);
+	if(!ret){
+		usart_puts2("DNS UDP init error.\r\n");
+		return 0;
+	}
 
-	// init
-	BC95Udp_init(&udpclient, &bc95);
-	CoAP_init(&coap, &udpclient);
-    
-    // set handler
-	CoAP_response(&coap, responseHandler);
-	CoAP_start(&coap);
-	CoAP_get(&coap,"coap.me", 5683, "/hello");
+		// get IMI
+	usart_puts2("device IMI: ");
+	ret = NBUartGetIMI(&nb, text);
+	if(ret){
+		usart_puts2(text);
+		usart_puts2("\r\n");
+	}
 
+	//attach to the network
+	do{
+		usart_puts2("attact...\r\n");
+		ret = NBUartAttachNetwork(&nb);
+	}while(!ret);
+
+	// get IMI
+	usart_puts2("device IMI: ");
+	ret = NBUartGetIMI(&nb, text);
+	if(ret){
+		usart_puts2(text);
+		usart_puts2("\r\n");
+	}
+
+	usart_puts2("device IP: ");
+	char ip[20];
+	ret = NBUartGetIPAddress(&nb, ip);
+	if(ret){
+		usart_puts2(ip);
+		usart_puts2("\r\n");
+	}
+
+	// initialize Microgear
+	ret = MicrogearInit(&mg, &main_udp, &dns_udp, "coap.netpie.io", APPID, KEY, SECRET);
+	if(!ret){
+		usart_puts2("\r\n Microgear init fail\r\n");
+		return 0;
+	}
+
+	usart_puts2("start publishing loop.\r\n");
+	
+	int cnt=0;
 	while(true){
-		CoAP_loop(&coap);
+		sprintf(text, "%d\r\n", cnt);
+		usart_puts2("publish: ");
+		usart_puts2(text);
+		usart_puts2("\r\n");
+
+		uint16_t ret = MicrogearPublishInt(&mg, "/nbiot/rssi", cnt);
+		MicrogearWriteFeed(&mg, "agrinno01", "Temp : 25");
+		if(ret == 0){
+			usart_puts2("Microgear fail\r\n");			
+		}
+		cnt++;
+
+		if(MicrogearIsReboot(&mg)){
+			goto start;
+		}
 	}
-	// end
-	usart_puts2("end\r\n");
+	usart_puts2("END\r\n");
 }
 

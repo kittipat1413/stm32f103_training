@@ -1,9 +1,11 @@
 #include "stm32f10x.h"
 #include "stm32f10x_conf.h"
-#include "BC95.h"
-//#include <queue>
-#include "BC95Udp.h"
-#include "Dns.h"
+// #include "./libMicroGear/atcommand.h"
+#include "./libMicroGear/NBQueue.h"
+#include "./libMicroGear/NBUart.h"
+#include "./libMicroGear/NBDNS.h"
+#include "./libMicroGear/NBCoAP.h"
+#include "./libMicroGear/NBMicrogear.h"
 
 void init_usart1(void);
 void init_usart2(void);
@@ -14,10 +16,6 @@ void usart_puts2(char* s);
 
 void USART1_IRQHandler(void);
 void USART2_IRQHandler(void);
-
-BC95_str bc95;
-BC95UDP udpclient;
-DNS_CLIENT dns;
 
 static inline void Delay_1us(uint32_t nCnt_1us)
 {
@@ -32,6 +30,17 @@ static inline void Delay(uint32_t nCnt_1us)
 
 			while(nCnt_1us--);
 }
+
+NBQueue q;
+NBUart nb;
+UDPConnection main_udp, dns_udp;
+DNSClient dns;
+CoAPClient ap;
+Microgear mg;
+
+#define APPID    "testSTM32iot"
+#define KEY      "fpqdyJ2TSoYbjW3"
+#define SECRET   "qZzPf0KjlFkYeLHsr3DbgU1ZB"
 
 void init_usart1()
 {
@@ -121,22 +130,20 @@ void init_usart2()
 	USART_Cmd(USART2, ENABLE);
 }
 
-// char buffer[10];
-// uint8_t idx=0;
-// bool status = false;
-
 void USART1_IRQHandler(void)
 {
-
+	//char cmd[20];
     char b;    
     if(USART_GetFlagStatus(USART1, USART_FLAG_RXNE) == SET) {
 
-          b =  USART_ReceiveData(USART1);
+        b =  USART_ReceiveData(USART1);
+        NBQueueInsert(&q, (uint8_t)b);
 
-          BC95_push(&bc95,b);
+		//USART_SendData(USART2, b);
+        //sprintf(cmd, "index: %u\r\n", bc95->InboundIndex);
+        //usart_puts2(cmd);
     }
 }
-
 
 void USART2_IRQHandler(void)
 {
@@ -177,42 +184,97 @@ void usart_puts2(char* s)
     }
 }
 
-char remoteIP[16];
-char *premoteIP;
+void responseHandler(CoapPacket *packet, char* remoteIP, int remotePort){
+	char buff[6];
+	usart_puts2("CoAP Response Code: ");
+	sprintf(buff, "%d.%02d\n", packet->Code >> 5, packet->Code & 0b00011111);
+    usart_puts2(buff);
+
+    for (int i=0; i< packet->Payloadlen; i++) {
+        //Serial.print((char) (packet->payload[i]));
+        char x[1];
+        sprintf(x,"%c", (char) (packet->Payload[i]));
+        usart_puts2(x);
+    }
+}
 
 int main(void)
 {
-	// init
+	char text[200];
+	bool ret= false;
+	uint16_t datalen=0;
+	// small delay
+	Delay_1us(1000000);
+
+	// initialize UART
 	init_usart1();
 	init_usart2();
 
-	// bc95 init UART
-	BC95_init(USART1, &bc95);
-	Delay_1us(500000);
-	usart_puts2("starting...\r\n");
+	usart_puts2("START\r\n");
 
-	// attach
-	while(!BC95_attachNetwork(&bc95)){
-		usart_puts2("attach..\r\n");
+	// initialize NB-iot Queue
+	NBQueueInit(&q);
+	// initialize NB-iot UART
+	NBUartInit(&nb, USART1, &q);
+	// initialize NB-iot UDP
+	ret = UDPInit(&main_udp, &nb);
+	if(!ret){
+		usart_puts2("UDP init error.\r\n");
+		return 0;
 	}
-	usart_puts2("NB-IOT connected..\r\n");
 
-	DNS_CLIENT_init(&dns, &bc95);
-	DNS_CLIENT_begin(&dns, "8.8.8.8");
-	premoteIP = remoteIP;
-	int ret = DNS_CLIENT_getHostByName(&dns, "coap.netpie.io", premoteIP);
-	char out[30];
-	sprintf(out, "ret is: %d\r\n", ret);
-	usart_puts2(out);
+	//attach to the network
+	do{
+		usart_puts2("attact...\r\n");
+		ret = NBUartAttachNetwork(&nb);
+	}while(!ret);
 
-	// print
-	usart_puts2("the resolved IP address is: ");
-	//usart_puts2(remoteIP);
+	// get IMI
+	usart_puts2("device IMI: ");
+	ret = NBUartGetIMI(&nb, text);
+	if(ret){
+		usart_puts2(text);
+		usart_puts2("\r\n");
+	}
+
+	usart_puts2("device IP: ");
+	char ip[20];
+	ret = NBUartGetIPAddress(&nb, ip);
+	if(ret){
+		usart_puts2(ip);
+		usart_puts2("\r\n");
+	}
+
+	// UDP Connect
+	ret = UDPConnect(&main_udp, ip, 8080);
+	if(!ret){
+		usart_puts2("UDP Connect error.\r\n");
+		return 0;
+	}
+
+	// send UDP packet
+	sprintf(text, "HelloWorld");
+	datalen = UDPWrite(&main_udp, (uint8_t*)text, strlen(text));
+	ret = UDPSendPacket(&main_udp);
+	Delay_1us(3000000);
+
+	// receive UDP packet
+	int inboundDataLen=0;
+	inboundDataLen = UDPParsePacket(&main_udp);
+	sprintf(text,"inbound len:%d\r\n", inboundDataLen);
+	usart_puts2(text);
+
+	// handle UDP packet
+	UDPRead(&main_udp, (uint8_t*)text, inboundDataLen);
+	usart_puts2(text);
+	usart_puts2("\r\n");
 	
-	sprintf(out, "%d.%d.%d.%d\r\n", remoteIP[0],remoteIP[1],remoteIP[2],remoteIP[3]);
-    usart_puts2(out);
-    
-	// end
-	usart_puts2("end\r\n");
+	// UDP Disconnect
+	ret = UDPDisconnect(&main_udp);
+	if(!ret){
+		usart_puts2("UDP Disconnect error.\r\n");
+		return 0;
+	}
+	usart_puts2("END\r\n");
 }
 

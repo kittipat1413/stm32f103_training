@@ -1,5 +1,17 @@
-#ifndef CoAP_H_
-#define CoAP_H_
+#ifndef NBCoAP_H_
+#define NBCoAP_H_
+
+#include "stm32f10x.h"
+#include "stm32f10x_conf.h"
+#include "stm32f10x_usart.h"
+#include "stm32f10x_rcc.h"
+#include <stdio.h>
+#include <unistd.h>
+#include <stdbool.h>
+#include <string.h>
+#include "NBQueue.h"
+#include "NBUart.h"
+#include "NBDNS.h"
 
 #define MAX_CALLBACK 10
 
@@ -79,56 +91,51 @@ typedef enum {
 } COAP_CONTENT_TYPE;
 
 typedef struct CoapOption {
-	uint8_t number;
-	uint8_t length;
-	uint8_t *buffer;
+	uint8_t Number;
+	uint8_t Length;
+	uint8_t *Buffer;
 } CoapOption;
 
 typedef struct CoapPacket {
-    uint8_t type;
-    uint8_t code;
-    uint8_t *token;
-    uint8_t tokenlen;
-    uint8_t *payload;
-    uint8_t payloadlen;
-    uint16_t messageid;
+    uint8_t Type;
+    uint8_t Code;
+    uint8_t *Token;
+    uint8_t Tokenlen;
+    uint8_t *Payload;
+    uint8_t Payloadlen;
+    uint16_t MessageID;
 
-    uint8_t optionnum;
-    CoapOption options[MAX_OPTION_NUM];
+    uint8_t OptionNum;
+    CoapOption Options[MAX_OPTION_NUM];
 } CoapPacket;
 
 typedef void (*callback)(CoapPacket*, char*, int);
 
 typedef struct {
-	char u[MAX_CALLBACK][300];
-	callback c[MAX_CALLBACK];
+	char U[MAX_CALLBACK][300];
+	callback C[MAX_CALLBACK];
 } CoapUri;
 
-typedef struct Coap {
-	BC95UDP *_udp;
-	CoapUri uri;
-	callback resp;
-	int _port;
-} Coap;
+typedef struct CoAPClient {
+	CoapUri URI;
+	callback ResponseCallback;
+	int Port;
+	UDPConnection* UDP;
+	DNSClient DNS;
+} CoAPClient;
 
-// method
-void CoAPUri_init(CoapUri *coapUri);
-void CoAPUri_add(CoapUri *coapUri, callback call, char* url);
-callback CoAPUri_find(CoapUri *coapUri, char* url);
+// setup
+bool CoAPInit(CoAPClient* ap, UDPConnection* udp, UDPConnection* dns_udp);
+bool CoAPStart(CoAPClient* ap);
+bool CoAPStartPort(CoAPClient* ap, int port);
+bool CoAPStop(CoAPClient* ap);
 
-void CoAP_init(Coap *coap, BC95UDP *udp);
-bool CoAP_start(Coap *coap);
-bool CoAP_start_port(Coap *coap, int port);
-void CoAP_response(Coap *coap, callback c);
-void CoAP_server(Coap *coap, callback c, char* url);
-uint16_t CoAP_sendPacket(Coap *coap, CoapPacket *packet, char* ip);
-uint16_t CoAP_sendPacket_port(Coap *coap, CoapPacket *packet, char* ip, int port);
-uint16_t CoAP_get(Coap *coap, char *ip, int port, char *url);
-uint16_t CoAP_put(Coap *coap, char *ip, int port, char *url, char *payload);
+// handler
+bool CoAPSetResponseCallback(CoAPClient* ap, callback c);
+uint16_t CoAPGet(CoAPClient* ap, char *ip, int port, char *url);
+uint16_t CoAPPut(CoAPClient* ap, char *ip, int port, char *url, char* payload);
 
-uint16_t CoAP_send(Coap *coap, char *host, int port, char *url, COAP_TYPE type, COAP_METHOD method, uint8_t *token, uint8_t tokenlen, uint8_t *payload, uint32_t payloadlen);
-int CoAP_parseOption(Coap *coap, CoapOption *option, uint16_t *running_delta, uint8_t **buf, size_t buflen);
-uint16_t CoAP_sendResponse(Coap *coap, char *ip, int port, uint16_t messageid, char *payload, int payloadlen, 
-	COAP_RESPONSE_CODE code, COAP_CONTENT_TYPE type, uint8_t *token, int tokenlen);
-bool CoAP_loop(Coap *coap);
+bool CoAPIsReboot(CoAPClient* ap);
+bool CoAPLoop(CoAPClient* ap);
+
 #endif
