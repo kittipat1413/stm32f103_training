@@ -80,20 +80,8 @@ void SetSysClockToHSE()
         /* PCLK1 = HCLK */
         RCC_PCLK1Config(RCC_HCLK_Div1);
 
- 		/* PLLCLK = 8MHz * 9 = 72 MHz */
-        RCC_PLLConfig(0x00010000, RCC_PLLMul_9);
-
-        /* Enable PLL */
-        RCC_PLLCmd( ENABLE);
-
-        /* Wait till PLL is ready */
-        while (RCC_GetFlagStatus(RCC_FLAG_PLLRDY) == RESET)
-        {
-        }
-
-        /* Select PLL as system clock source */
-        RCC_SYSCLKConfig( RCC_SYSCLKSource_PLLCLK);
-
+        /* Select HSE as system clock source */
+        RCC_SYSCLKConfig(RCC_SYSCLKSource_HSE);
 
         /* Wait till PLL is used as system clock source */
         while (RCC_GetSYSCLKSource() != 0x04)
