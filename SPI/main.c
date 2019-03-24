@@ -208,8 +208,8 @@ void SPIx_Init()
     // Step 1: Initialize SPI
     RCC_APB2PeriphClockCmd(SPIx_RCC, ENABLE);
     SPI_InitStruct.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_128;
-    SPI_InitStruct.SPI_CPHA = SPI_CPHA_1Edge;
-    SPI_InitStruct.SPI_CPOL = SPI_CPOL_Low;
+    SPI_InitStruct.SPI_CPHA = SPI_CPHA_2Edge;
+    SPI_InitStruct.SPI_CPOL = SPI_CPOL_High;
     SPI_InitStruct.SPI_DataSize = SPI_DataSize_8b;
     SPI_InitStruct.SPI_Direction = SPI_Direction_2Lines_FullDuplex;
     SPI_InitStruct.SPI_FirstBit = SPI_FirstBit_MSB;
@@ -407,39 +407,211 @@ int main(void)
     Delay_1us(5000);
     RTC_SetCounter(RTC_GetRTC_Counter(&RTC_DateTime));
 
-    begin() ;
-    beginMeasure();
+    // begin() ;
+    // beginMeasure();
+
+        Delay_1us(10);
+        SPIx_EnableSlave();
+
+        Delay_1us(10);
+        SPIx_Transfer(0x00| 0x2D);
+        Delay_1us(30);
+        SPIx_Transfer(0x08);
+        Delay_1us(10);
+
+	
+        Delay_1us(10);
+        SPIx_DisableSlave();
+        Delay_1us(1000);
+
+        Delay_1us(10);
+        SPIx_EnableSlave();
+
+        Delay_1us(10);
+        SPIx_Transfer(0x00| 0x31);
+        Delay_1us(30);
+        SPIx_Transfer(0b00001100);
+        Delay_1us(10);
+
+	
+        Delay_1us(10);
+        SPIx_DisableSlave();
+        Delay_1us(1000);
+
+     uint8_t msb=0;
+     uint8_t lsb=0;
+     int16_t z = 0;
+     uint8_t raw[2] = {0,0};
+
+     Delay_1us(1000000);
+        SPIx_EnableSlave();
+
+        Delay_1us(10);
+        SPIx_Transfer(0x80| 0x31);
+        Delay_1us(30);
+        msb = SPIx_Transfer(0x00);
+        Delay_1us(10);
+	
+        Delay_1us(10);
+        SPIx_DisableSlave();
+
+     sprintf(buffer, "data format: %d \r\n", msb);
+     usart_puts(buffer);
+
+     Delay_1us(1000000);
 
 	while (1) {
 
-	RTC_Counter = RTC_GetCounter();
-	sprintf(buffer, "\r\n\r\nCOUNTER: %d\r\n", (int)RTC_Counter);
-	usart_puts(buffer);
-	RTC_GetDateTime(RTC_Counter, &RTC_DateTime);
-	sprintf(buffer, "%02d:%02d:%02d\r\n",
-			RTC_DateTime.RTC_Hours, RTC_DateTime.RTC_Minutes, RTC_DateTime.RTC_Seconds);
-	usart_puts(buffer);
+	// RTC_Counter = RTC_GetCounter();
+	// sprintf(buffer, "\r\n\r\nCOUNTER: %d\r\n", (int)RTC_Counter);
+	// usart_puts(buffer);
+	// RTC_GetDateTime(RTC_Counter, &RTC_DateTime);
+	// sprintf(buffer, "%02d:%02d:%02d\r\n",
+	// 		RTC_DateTime.RTC_Hours, RTC_DateTime.RTC_Minutes, RTC_DateTime.RTC_Seconds);
+	// usart_puts(buffer);
 
 
+ //        SPIx_EnableSlave();
+ //        // Write command to slave to turn on LED blinking
+ //        SPIx_Transfer(0x0B);
+ //        Delay_1us(10);
+ //        // Write command to slave for asking LED blinking status
+ //        SPIx_Transfer(0x0E);
+ //        Delay_1us(10);
+ //        // Read LED blinking status (off/on) from slave by transmitting 
+ //        // dummy byte
+ //        receivedByte = SPIx_Transfer(0);
+ //        // Disable slave
+ //        SPIx_DisableSlave();
+
+ //    sprintf(buffer, "X : %d\r\n", receivedByte);
+	// usart_puts(buffer);
+
+        Delay_1us(10);
         SPIx_EnableSlave();
-        // Write command to slave to turn on LED blinking
-        SPIx_Transfer(0x0B);
+
         Delay_1us(10);
-        // Write command to slave for asking LED blinking status
-        SPIx_Transfer(0x0E);
+        SPIx_Transfer(0x80| 0x32);
+        Delay_1us(30);
+        lsb = SPIx_Transfer(0x00);
         Delay_1us(10);
-        // Read LED blinking status (off/on) from slave by transmitting 
-        // dummy byte
-        receivedByte = SPIx_Transfer(0);
-        // Disable slave
+	
+        Delay_1us(10);
         SPIx_DisableSlave();
 
-    sprintf(buffer, "X : %d\r\n", receivedByte);
-	usart_puts(buffer);
 
+        Delay_1us(10);
+        SPIx_EnableSlave();
+
+        Delay_1us(10);
+        SPIx_Transfer(0x80| 0x33);
+        Delay_1us(30);
+        msb = SPIx_Transfer(0x00);
+        Delay_1us(10);
 	
+        Delay_1us(10);
+        SPIx_DisableSlave();
+
+        raw[0] = msb;
+        raw[1] = lsb;
+
+        //msb = msb & 0b00000011;
+        memcpy(&z,raw,2);
+        // z = lsb;
+        // z = (((int16_t)msb << 8) | (int16_t)lsb);
+        z = (int16_t)((uint16_t)msb << 8 | (uint16_t)lsb);
+
+        // sprintf(buffer, "x: %d , msb: %d, lsb: %d\r\n", z, msb, lsb);
+        // usart_puts(buffer);
+
+        sprintf(buffer, "x: %f ", z/64.0*1.0f/256.0f );
+        usart_puts(buffer);
+ 
+		Delay_1us(10);
+        SPIx_EnableSlave();
+
+        Delay_1us(10);
+        SPIx_Transfer(0x80| 0x34);
+        Delay_1us(30);
+        lsb = SPIx_Transfer(0x00);
+        Delay_1us(10);
+	
+        Delay_1us(10);
+        SPIx_DisableSlave();
+
+
+        Delay_1us(10);
+        SPIx_EnableSlave();
+
+        Delay_1us(10);
+        SPIx_Transfer(0x80| 0x35);
+        Delay_1us(30);
+        msb = SPIx_Transfer(0x00);
+        Delay_1us(10);
+	
+        Delay_1us(10);
+        SPIx_DisableSlave();
+
+        raw[0] = msb;
+        raw[1] = lsb;
+
+        //msb = msb & 0b00000011;
+        memcpy(&z,raw,2);
+        // z = lsb;
+        // z = (((int16_t)msb << 8) | (int16_t)lsb);
+        z = (int16_t)((uint16_t)msb << 8 | (uint16_t)lsb);
+
+        // sprintf(buffer, "y: %d , msb: %d, lsb: %d\r\n", z, msb, lsb);
+        // usart_puts(buffer);
+
+        sprintf(buffer, "y: %f ", z/64.0*1.0f/256.0f );
+        usart_puts(buffer);
+
+        Delay_1us(10);
+        SPIx_EnableSlave();
+
+        Delay_1us(10);
+        SPIx_Transfer(0x80| 0x36);
+        Delay_1us(30);
+        lsb = SPIx_Transfer(0x00);
+        Delay_1us(10);
+	
+        Delay_1us(10);
+        SPIx_DisableSlave();
+
+
+        Delay_1us(10);
+        SPIx_EnableSlave();
+
+        Delay_1us(10);
+        SPIx_Transfer(0x80| 0x37);
+        Delay_1us(30);
+        msb = SPIx_Transfer(0x00);
+        Delay_1us(10);
+	
+        Delay_1us(10);
+        SPIx_DisableSlave();
+
+        raw[0] = msb;
+        raw[1] = lsb;
+
+        //msb = msb & 0b00000011;
+        memcpy(&z,raw,2);
+        // z = lsb;
+        // z = (((int16_t)msb << 8) | (int16_t)lsb);
+        z = (int16_t)((uint16_t)msb << 8 | (uint16_t)lsb);
+
+        // sprintf(buffer, "z: %d , msb: %d, lsb: %d\r\n", z, msb, lsb);
+        // usart_puts(buffer);
+
+        sprintf(buffer, "z: %f ", z/64.0*1.0f/256.0f );
+        usart_puts(buffer);
+
+        usart_puts("\r\n");
+
+        Delay_1us(50000);
 	/* delay */
-	while (RTC_Counter == RTC_GetCounter()) {}
+	// while (RTC_Counter == RTC_GetCounter()) {}
 
 	}
 
