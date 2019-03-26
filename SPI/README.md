@@ -1,2 +1,2 @@
-# SHT20-stm32
+# ADXL346 sensor
 
