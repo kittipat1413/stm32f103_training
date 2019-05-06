@@ -342,6 +342,8 @@ int main(void)
 	init_usart1();
 	init_EXIT();
     
+    usart_puts("\r\nSTART\r\n");
+
     //Set time
     RTC_Init();
     RTC_DateTimeTypeDef RTC_DateTime;
