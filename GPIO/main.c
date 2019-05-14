@@ -21,23 +21,22 @@ int main(void)
 
 	GPIO_InitTypeDef GPIO_InitStructure;
 
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
 
 	//Configure LED Pin
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_InitStructure.GPIO_Mode = 	GPIO_Mode_Out_PP;
-	GPIO_InitStructure.GPIO_Pin = 	GPIO_Pin_10; 	
-	GPIO_Init(GPIOA, &GPIO_InitStructure);
+	GPIO_InitStructure.GPIO_Pin = 	GPIO_Pin_13; 	
+	GPIO_Init(GPIOC, &GPIO_InitStructure);
 
 
 	while (1) {
 
-		GPIO_SetBits(GPIOA,GPIO_Pin_10);
+		GPIO_SetBits(GPIOC,GPIO_Pin_13);
+		Delay_1us(20000);
 
-		Delay_1us(1);
-		GPIO_ResetBits(GPIOA,GPIO_Pin_10);
-
-		Delay_1us(2);
+		GPIO_ResetBits(GPIOC,GPIO_Pin_13);
+		Delay_1us(20000);
 
 
 	}
