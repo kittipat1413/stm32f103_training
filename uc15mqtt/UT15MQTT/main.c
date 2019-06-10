@@ -241,8 +241,8 @@ int main(void)
 	p = UC15UartInternetGetIP(&uc);
 	usart_puts1(p);
 
-	char *host="203.151.50.158";
-	char *port="8091";
+	char *host="gb.netpie.io";
+	char *port="1883";
 	
 	bool ret;
 
@@ -251,14 +251,14 @@ int main(void)
 		usart_puts1("\nMQTT connected\n");
 	}
 
-	MqttPack connect = MqttPackCONNECT("python_test",NULL,NULL, 0, 0, 0, 0);
+	MqttPack connect = MqttPackCONNECT("be17913e-bdcf-4e76-a89a-3804174b7011","CAH3DBwJghdCAXzD4UeeEcq1Un3V1z7u","CAH3DBwJghdCAXzD4UeeEcq1Un3V1z7u", 0, 0, 0, 0);
 	ret = UC15MqttSend(&mqtt, connect.p, connect.len);
 	if(ret){
 		usart_puts1("\nmqtt connect send ok\n");
 	}
 
 	char *msg = "hello from 3G"; 
-	MqttPack publish = MqttPackPUBLISH("test/a", (uint8_t*)msg, strlen(msg), true);
+	MqttPack publish = MqttPackPUBLISH("test", (uint8_t*)msg, strlen(msg), true);
 	ret = UC15MqttSend(&mqtt, publish.p, publish.len);
 	if(ret){
 		usart_puts1("\nmqtt pub send ok\n");
@@ -373,8 +373,6 @@ int main(void)
 	// 	sprintf(k, "byte: %c %x\n", connect.p[i], connect.p[i]);
 	// 	usart_puts1(k);
 	// }
-
-
 
 	ret = UC15MqttDisconnectMQTTServer(&mqtt);
 	if(ret){
