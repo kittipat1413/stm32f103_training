@@ -148,7 +148,7 @@ void init_usart1(void)
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
 
 	/* Configure the USART1 */
-	USART_InitStructure.USART_BaudRate = 115200;
+	USART_InitStructure.USART_BaudRate = 9600;
 	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
 	USART_InitStructure.USART_StopBits = USART_StopBits_1;
 	USART_InitStructure.USART_Parity = USART_Parity_No;
@@ -182,7 +182,7 @@ void init_usart2(void)
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
 
 	/* Configure the USART1 */
-	USART_InitStructure.USART_BaudRate = 115200;
+	USART_InitStructure.USART_BaudRate = 9600;
 	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
 	USART_InitStructure.USART_StopBits = USART_StopBits_1;
 	USART_InitStructure.USART_Parity = USART_Parity_No;
@@ -259,30 +259,44 @@ int main(void)
   atparser_init(&parser, readFunc, writeFunc, readableFunc, sleepFunc);
 
   //send command
-  atparser_write(&parser, &command[0], 8);
+  // atparser_write(&parser, &command[0], 8);
+
+  char buffer[100];
 
   while (1)
   { 
   //send command  
-  // atparser_write(&parser, &command[0], 8);
+  atparser_write(&parser, &command[0], 8);
+  delay(100);
   //received data
   atparser_set_timeout(&parser, 1000000); 
   int ret = atparser_read(&parser, &data_BUF[0], 9);
     
     if (ret != -1)
     {
-      // send_hex(&data_BUF[0],9);
+      sprintf(buffer, "\nraw HEX = %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X \n", data_BUF[0],data_BUF[1],data_BUF[2],data_BUF[3],data_BUF[4],data_BUF[5],data_BUF[6],data_BUF[7],data_BUF[8]);
+      usart_puts(buffer);
+
       uint16_t crc;
       int i;
-      char buffer[100];
       /* MODBUS CRC initial value is 0xFFFF. */
       crc = 0xFFFF;
       for(i = 0; i < 7; i++)
         crc = crc16_update(crc, data_BUF[i]);
       
-      sprintf(buffer,"CRC: %04X", crc);
-      usart_puts(buffer);
+	  if( crc == ( ( (uint16_t)data_BUF[8] )<<8 | (uint16_t)data_BUF[7] ) )   
+	   {
+	      sprintf(buffer,"\nCRC: %04X = %04X \n", crc ,( ( (uint16_t)data_BUF[8] )<<8 | (uint16_t)data_BUF[7] ) );
+	      usart_puts(buffer);
+
+		  sprintf(buffer,"\nHumid: %d \n", (( ((uint16_t)data_BUF[3])<<8 | (uint16_t)data_BUF[4] )/10) );
+	      usart_puts(buffer);      
+    	 	
+          sprintf(buffer,"\nTemp: %d \n", (int16_t)(( ((uint16_t)data_BUF[5])<<8 | (uint16_t)data_BUF[6] )/10) );
+	      usart_puts(buffer);      
     
+
+	   }    
     }
 
   }
