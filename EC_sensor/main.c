@@ -36,8 +36,8 @@ uint16_t crc16_update(uint16_t crc, uint8_t a);
 
 uint8_t data_BUF[9] = {'\0'};
 uint8_t command[8] = {0x01, 0x03, 0x00, 0x02, 0x00, 0x02, 0x65, 0xCB};
-
-
+uint8_t command2[8] = {0x01, 0x03, 0x00, 0x12, 0x00, 0x02, 0x64, 0x0E};
+uint8_t command3[8] = {0x01, 0x03, 0x00, 0x14, 0x00, 0x02, 0x84, 0x0F};
 
 void USART2_IRQHandler(void)
 {
@@ -262,6 +262,10 @@ int main(void)
   // atparser_write(&parser, &command[0], 8);
 
   char buffer[100];
+  int ret;
+  uint16_t crc;
+  int i;
+  
 
   while (1)
   { 
@@ -270,15 +274,15 @@ int main(void)
   delay(100);
   //received data
   atparser_set_timeout(&parser, 1000000); 
-  int ret = atparser_read(&parser, &data_BUF[0], 9);
+  ret = atparser_read(&parser, &data_BUF[0], 9);
     
     if (ret != -1)
     {
       sprintf(buffer, "\nraw HEX = %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X \n", data_BUF[0],data_BUF[1],data_BUF[2],data_BUF[3],data_BUF[4],data_BUF[5],data_BUF[6],data_BUF[7],data_BUF[8]);
       usart_puts(buffer);
 
-      uint16_t crc;
-      int i;
+      // uint16_t crc;
+      // int i;
       /* MODBUS CRC initial value is 0xFFFF. */
       crc = 0xFFFF;
       for(i = 0; i < 7; i++)
@@ -298,6 +302,42 @@ int main(void)
 
 	   }    
     }
+
+
+  //send command  
+  atparser_write(&parser, &command3[0], 8);
+  delay(100);
+  //received data
+  atparser_set_timeout(&parser, 1000000); 
+  ret = atparser_read(&parser, &data_BUF[0], 9);
+    
+    if (ret != -1)
+    {
+      sprintf(buffer, "\nraw HEX = %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X \n", data_BUF[0],data_BUF[1],data_BUF[2],data_BUF[3],data_BUF[4],data_BUF[5],data_BUF[6],data_BUF[7],data_BUF[8]);
+      usart_puts(buffer);
+
+      // uint16_t crc;
+      // int i;
+      /* MODBUS CRC initial value is 0xFFFF. */
+      crc = 0xFFFF;
+      for(i = 0; i < 7; i++)
+        crc = crc16_update(crc, data_BUF[i]);
+      
+	  if( crc == ( ( (uint16_t)data_BUF[8] )<<8 | (uint16_t)data_BUF[7] ) )   
+	   {
+	      sprintf(buffer,"\nCRC: %04X = %04X \n", crc ,( ( (uint16_t)data_BUF[8] )<<8 | (uint16_t)data_BUF[7] ) );
+	      usart_puts(buffer);
+
+		  sprintf(buffer,"\nSalt(mg/L): %d \n", ( ((uint16_t)data_BUF[3])<<8 | (uint16_t)data_BUF[4] ) );
+	      usart_puts(buffer);      
+    	 	
+          sprintf(buffer,"\nEC(us/cm): %d \n", ( ((uint16_t)data_BUF[5])<<8 | (uint16_t)data_BUF[6] ) );
+	      usart_puts(buffer);      
+    
+
+	   }    
+    }
+
 
   }
 }
