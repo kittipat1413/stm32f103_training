@@ -41,8 +41,8 @@ int atparser_getc(atparser_t* self){
 }
 
 void atparser_flush(atparser_t* self){
+    uint8_t data;
     while(self->readable()){
-        uint8_t data;
         self->read(&data);
     }
 }
