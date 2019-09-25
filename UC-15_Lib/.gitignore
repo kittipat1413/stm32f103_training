@@ -1,0 +1,17 @@
+.tags*
+*.o
+*.d
+cscope*
+*.bin
+*.map
+*.elf
+*.out
+*.swp
+*.swn
+*.swo
+*.gch
+*.flash
+*.dump
+*.*~
+.vscode/settings.json
+firmware.map
