@@ -15,4 +15,4 @@ cscope*
 *.*~
 .vscode/settings.json
 firmware.map
-.STM_Lib/
+/STM_Lib
