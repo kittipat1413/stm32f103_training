@@ -105,8 +105,8 @@ clean:
 	rm -rf $(EXECUTABLE)
 	rm -rf $(BIN_IMAGE)
 #Make flash with ST-Link
-#flash_stlink:
-#	st-flash write $(BIN_IMAGE) 0x8000000
+flash_stlink:
+	st-flash write $(BIN_IMAGE) 0x8000000
 #Make flash with Black Magic Probe(BMP)
 #flash:
 #	$(GDB) firmware.elf -x ./bmp_flash.gdb
@@ -128,6 +128,8 @@ flash_openocd:
 	-c "verify_image $(EXECUTABLE)" \
 	-c "reset run" -c shutdown
 #automatically formate
+erase:
+	st-flash erase
 astyle: 
 	astyle -r --exclude=lib  *.c *.h
 #============================================================================#
