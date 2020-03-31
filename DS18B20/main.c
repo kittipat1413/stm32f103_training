@@ -94,11 +94,11 @@ int main(void)
     init_usart1();
 	// Tick every 1 ms
 
-	ds18b20_init(GPIOA, GPIO_Pin_1, TIM2);
+	// ds18b20_init(GPIOA, GPIO_Pin_1, TIM2);
 
     while(1)
     {
-
+        ds18b20_init(GPIOA, GPIO_Pin_1, TIM2);
         if(one_wire_reset_pulse()){
            usart_puts("ready_address");
            usart_puts("\n"); 
@@ -115,6 +115,26 @@ int main(void)
         usart_puts(out);
         usart_puts("\n");
         delay(5000);
+
+
+        ds18b20_init(GPIOA, GPIO_Pin_2, TIM2);
+        if(one_wire_reset_pulse()){
+           usart_puts("ready_address");
+           usart_puts("\n"); 
+
+           data = one_wire_read_rom();
+           sprintf(out, "%d:%d:%d:%d:%d:%d:%d:%d", data.address[7],data.address[6],data.address[5],data.address[4],data.address[3],data.address[2],data.address[1],data.address[0]);
+           usart_puts(out);
+           usart_puts("\n");
+        }
+        ds18b20_convert_temperature_simple();
+        delay(5000);
+        temp_data = ds18b20_read_temperature_simple();
+        sprintf(out, "temp : %d", temp_data.integer);
+        usart_puts(out);
+        usart_puts("\n");
+        delay(5000);
+
 
     }
 }
