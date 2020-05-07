@@ -130,6 +130,8 @@ flash_openocd:
 #automatically formate
 erase:
 	st-flash erase
+gdbtui:
+	$(GDB) -tui -x ../st_util_init.gdb
 astyle: 
 	astyle -r --exclude=lib  *.c *.h
 #============================================================================#
